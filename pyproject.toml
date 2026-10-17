@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mtengine"
+version = "0.1.0"
+description = "Computational engine for torus actions, matroids and GKM theory: one interface to Macaulay2, gfan, polymake, Singular, nauty and Lean/Mathlib"
+requires-python = ">=3.11"
+dependencies = ["mcp>=2.3"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+mte = "mtengine.cli:main"
+mtengine-mcp = "mtengine.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: takes more than a few seconds"]
