@@ -56,6 +56,15 @@ def test_canonical_forms():
     assert a == b and a != c
 
 
+def test_canonical_forms_traces():
+    from mtengine.backends.nauty import canonical_form
+    path1 = canonical_form(4, [(0, 1), (1, 2), (2, 3)], algorithm="traces")
+    path2 = canonical_form(4, [(2, 0), (0, 3), (3, 1)], algorithm="traces")
+    star = canonical_form(4, [(0, 1), (0, 2), (0, 3)], algorithm="traces")
+    assert path1 == path2 and path1 != star
+    assert path1.startswith("traces:")
+
+
 def test_face_poset_isomorphism():
     # Fl_(1,2) and Fl_(2,1) are both CP^2 with the same torus action: isomorphic face posets
     p = val(api.hessenberg_face_poset_canonical([1, 2], [2, 2]))
