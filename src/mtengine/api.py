@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import core
-from .backends import gfan, lean, macaulay2, nauty, polymake, singular
+from .backends import gfan, lean, macaulay2, nauty, polymake, regina, singular
 from .domain import hessenberg as hs
 from .domain import posets
 
@@ -16,7 +16,8 @@ Json = dict[str, Any]
 def versions() -> Json:
     """Versions of all backends ("MISSING" if a tool is not installed)."""
     return {t: core.tool_version(t) for t in
-            ["engine", "python", "macaulay2", "gfan", "polymake", "singular", "nauty", "lean"]}
+            ["engine", "python", "macaulay2", "gfan", "polymake", "singular", "nauty", "lean",
+             "regina"]}
 
 
 # ------------------------------------------------------------------ raw backends
@@ -73,6 +74,78 @@ def lean_check(source: str, theorems: list[str] | None = None, timeout: float = 
     named theorem depends on (sorryAx => it uses sorry)."""
     return core.cached("lean", "check", {"source": source, "theorems": theorems or []},
                        lambda: lean.check(source, theorems, timeout), use_cache)
+
+
+# ------------------------------------------------------------------ Regina (low-dimensional topology)
+# Triangulations are passed as Regina isomorphism signatures (e.g. "cPcbbbiht" is the
+# figure-eight knot complement); get one from Regina with `tri.isoSig()`.
+def regina_run(code: str, timeout: float = 600, use_cache: bool = True) -> Json:
+    """Run Python code with Regina's `regina` module imported; return its standard output."""
+    return core.cached("regina", "run", {"code": code},
+                       lambda: regina.run(code, timeout), use_cache)
+
+
+def triangulation_invariants(isosig: str, dim: int = 3, recognise: bool = False,
+                             timeout: float = 600, use_cache: bool = True) -> Json:
+    """Basic invariants of a 3- or 4-manifold triangulation given by its isomorphism signature:
+    validity, closed/orientable/ideal, Euler characteristic, H1 and H2, a simplified pi1
+    presentation (and Regina's name for the group, if recognised), census names (dim 3), and the
+    intersection form (closed orientable dim 4). recognise=True (dim 3) also runs 3-sphere / ball /
+    solid-torus recognition and the prime decomposition, which can be slow."""
+    return core.cached("regina", "invariants", {"sig": isosig, "dim": dim, "recognise": recognise},
+                       lambda: regina.invariants(isosig, dim, recognise, timeout), use_cache)
+
+
+def census_lookup(isosig: str, use_cache: bool = True) -> Json:
+    """Names of a 3-manifold triangulation in Regina's census databases (closed orientable and
+    non-orientable, cusped hyperbolic, Hodgson-Weeks closed hyperbolic, knot/link complements).
+    Only exact triangulations are found: simplify first if needed."""
+    return core.cached("regina", "census_lookup", {"sig": isosig},
+                       lambda: regina.census_lookup(isosig), use_cache)
+
+
+def hyperbolic_structure(isosig: str, fillings: list[list[int] | None] | None = None,
+                         attempts: int = 20, use_cache: bool = True) -> Json:
+    """SnapPea (inside Regina): solution type, hyperbolic volume and its precision, cusps, for a
+    3-manifold triangulation, optionally Dehn filled ([[p, q] or null per cusp]).
+    volume_trustworthy is False for degenerate/flat solutions. Closed triangulations are retried
+    up to `attempts` times because SnapPea's handling of them is random.
+    Slopes are in the peripheral basis SnapPea assigns to *this* triangulation: a manifold
+    with the same census name in SnapPy may be its mirror image, which turns (p, q) into
+    (-p, q)."""
+    return core.cached("regina", "hyperbolic",
+                       {"sig": isosig, "fillings": fillings, "attempts": attempts},
+                       lambda: regina.hyperbolic(isosig, fillings, attempts), use_cache)
+
+
+def turaev_viro(isosig: str, r: int, timeout: float = 3600, use_cache: bool = True) -> Json:
+    """Exact Turaev-Viro invariant TV_r of a closed 3-manifold triangulation, as cyclotomic field
+    elements (both parities of the root of unity for odd r), and its real value at every root
+    q0 = exp(i pi w / r), w coprime to r, 0 < w < r. Cost grows quickly with r and treewidth."""
+    return core.cached("regina", "turaev_viro", {"sig": isosig, "r": r},
+                       lambda: regina.turaev_viro(isosig, r, timeout), use_cache)
+
+
+def link_invariants(code: str | list[Any], format: str = "pd", complement: bool = True,
+                    use_cache: bool = True) -> Json:
+    """Knot/link invariants from a diagram: crossings, components, writhe, Jones (in x = sqrt(t)),
+    HOMFLY-PT (LM and AZ conventions), Alexander (knots), and the complement's simplified
+    triangulation with its census names. format: pd, dt, gauss, signed_gauss, oriented_gauss,
+    jenkins or sig (Regina's knot signature); codes may be strings or lists."""
+    return core.cached("regina", "link_invariants",
+                       {"code": code, "format": format, "complement": complement},
+                       lambda: regina.link_invariants(code, format, complement), use_cache)
+
+
+def normal_surfaces(isosig: str, coords: str = "quad", which: str = "vertex", limit: int = 200,
+                    timeout: float = 3600, use_cache: bool = True) -> Json:
+    """Enumerate embedded normal surfaces of a 3-manifold triangulation (Regina): the number of
+    vertex or fundamental surfaces in quad / standard / quad_oct / almost_normal coordinates, and
+    for each (up to `limit`) Euler characteristic, orientability, two-sidedness, boundary count."""
+    return core.cached("regina", "normal_surfaces",
+                       {"sig": isosig, "coords": coords, "which": which, "limit": limit},
+                       lambda: regina.normal_surfaces(isosig, coords, which, limit, timeout),
+                       use_cache)
 
 
 # ------------------------------------------------------------------ Hessenberg varieties
@@ -149,5 +222,7 @@ def job_status(job_id: str) -> Json:
 
 FUNCTIONS = {f.__name__: f for f in [
     versions, m2_run, singular_run, gkm_betti, tropical_variety, simplicial_homology,
-    graph_canonical_form, lean_check, hessenberg_betti, hessenberg_betti_gkm, hessenberg_faces,
-    hessenberg_face_poset_canonical, hessenberg_face_poset_homology, job_submit, job_status]}
+    graph_canonical_form, lean_check, regina_run, triangulation_invariants, census_lookup,
+    hyperbolic_structure, turaev_viro, link_invariants, normal_surfaces, hessenberg_betti,
+    hessenberg_betti_gkm, hessenberg_faces, hessenberg_face_poset_canonical,
+    hessenberg_face_poset_homology, job_submit, job_status]}

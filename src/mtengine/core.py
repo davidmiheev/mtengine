@@ -81,6 +81,9 @@ def tool_version(tool: str) -> str:
     if tool == "lean":
         from .backends import lean
         return lean.version()
+    if tool == "regina":
+        from .backends import regina
+        return regina.version()
     if tool == "engine":
         return __version__
     cmd, line = _VERSION_CMDS[tool]
