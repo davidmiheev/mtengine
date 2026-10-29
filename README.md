@@ -2,7 +2,9 @@
 
 One interface to the tools of the matroid_toric project: **Macaulay2, gfan, polymake, Singular,
 nauty, Lean 4/Mathlib**, plus the project's own mathematics (regular semisimple and partial
-Hessenberg varieties, GKM graphs, face posets). Written to be split into its own repository.
+Hessenberg varieties, GKM graphs, face posets). Split out of
+[matroid_toric](https://github.com/davidmiheev/matroid_toric), which uses it as a git submodule at
+`engine/`; the history of `engine/` is preserved here.
 
 ## Design
 
@@ -51,16 +53,27 @@ Hessenberg varieties, GKM graphs, face posets). Written to be split into its own
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 .venv/bin/mte versions
 .venv/bin/mte call hessenberg_betti '{"kbar": [2, 2], "h": [2, 2]}'      # Gr(2,4)
-.venv/bin/pytest                                                           # 25 tests, ~25 s
+.venv/bin/pytest                                                           # 26 tests, ~30 s
 ```
 
-MCP (Claude Code picks up the repository's `.mcp.json`; for other clients point them at
-`engine/.venv/bin/mtengine-mcp`, stdio transport).
+MCP server: `.venv/bin/mtengine-mcp` (stdio transport). For Claude Code, add to the `.mcp.json`
+of the project that uses it:
 
-The Lean backend uses the project in `../formal` (override with `MTENGINE_LEAN_PROJECT`).
+```json
+{ "mcpServers": { "mtengine": { "command": "engine/.venv/bin/mtengine-mcp" } } }
+```
+
+(with the path adjusted to where this repository is checked out). Backends that are not
+installed report `MISSING` in `mte versions`; everything else still works.
+
+The Lean backend compiles against a Lake project with Mathlib. By default it looks for
+`../formal` next to this checkout, which is where it is inside matroid_toric. Elsewhere, set
+`MTENGINE_LEAN_PROJECT` to the project directory.
 
 ## Reproducible toolchain
 
 `Dockerfile` builds Ubuntu 24.04 with every backend at the versions tested here
 (Macaulay2 1.22, gfan 0.6.2, polymake 4.11, Singular 4.3.2, nauty 2.8.8, Lean 4.36.0-rc1 +
-Mathlib). Build from the repository root: `docker build -f engine/Dockerfile .`
+Mathlib). Build from this repository: `docker build -t mtengine .`. To use the Lean backend,
+mount a Lake project at `/work/formal` (e.g. matroid_toric's `formal/`). The Dockerfile has not
+been test-built yet.
