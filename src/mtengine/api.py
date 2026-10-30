@@ -137,6 +137,33 @@ def link_invariants(code: str | list[Any], format: str = "pd", complement: bool 
                        lambda: regina.link_invariants(code, format, complement), use_cache)
 
 
+def pachner_walk(isosig: str, moves: int, seeds: list[int], mix44: int = 0,
+                 timeout: float = 3600, use_cache: bool = True) -> Json:
+    """Scramble a 3-manifold triangulation reproducibly: for each seed, `moves` random 2-3
+    Pachner moves (each adds a tetrahedron), each followed by `mix44` random 4-4 moves. Returns
+    [{"seed", "isosig", "size"}]. Same manifold, larger and messier triangulation."""
+    return core.cached("regina", "pachner_walk",
+                       {"sig": isosig, "moves": moves, "seeds": seeds, "mix44": mix44},
+                       lambda: regina.pachner_walk(isosig, moves, seeds, mix44, timeout), use_cache)
+
+
+def simplify_triangulations(isosigs: list[str], trials: int = 1, max_height: int = 0,
+                            target_size: int | None = None, threads: int = 1,
+                            lookup: bool = False, timeout: float = 3600,
+                            use_cache: bool = True) -> Json:
+    """Simplify a batch of 3-manifold triangulations with Regina. Greedy simplify() is
+    randomised, so it runs `trials` independent times and keeps the smallest result; then
+    simplifyExhaustive at heights 1..max_height (height h may pass through h extra tetrahedra;
+    cost grows very fast with h and size) until no further reduction or `target_size` is
+    reached. Per input: greedy sizes, sizes after each height, final isosig (and census names
+    if lookup)."""
+    return core.cached("regina", "simplify_many",
+                       {"sigs": isosigs, "trials": trials, "max_height": max_height,
+                        "target_size": target_size, "threads": threads, "lookup": lookup},
+                       lambda: regina.simplify_many(isosigs, trials, max_height, target_size,
+                                                    threads, lookup, timeout), use_cache)
+
+
 def normal_surfaces(isosig: str, coords: str = "quad", which: str = "vertex", limit: int = 200,
                     timeout: float = 3600, use_cache: bool = True) -> Json:
     """Enumerate embedded normal surfaces of a 3-manifold triangulation (Regina): the number of
@@ -223,6 +250,7 @@ def job_status(job_id: str) -> Json:
 FUNCTIONS = {f.__name__: f for f in [
     versions, m2_run, singular_run, gkm_betti, tropical_variety, simplicial_homology,
     graph_canonical_form, lean_check, regina_run, triangulation_invariants, census_lookup,
-    hyperbolic_structure, turaev_viro, link_invariants, normal_surfaces, hessenberg_betti,
+    hyperbolic_structure, turaev_viro, link_invariants, normal_surfaces, pachner_walk,
+    simplify_triangulations, hessenberg_betti,
     hessenberg_betti_gkm, hessenberg_faces, hessenberg_face_poset_canonical,
     hessenberg_face_poset_homology, job_submit, job_status]}

@@ -105,3 +105,22 @@ def test_errors_are_reported():
         api.triangulation_invariants("not-a-signature", use_cache=False)
     with pytest.raises(core.EngineError, match="unknown link format"):
         api.link_invariants("x", format="nope", use_cache=False)
+
+
+def test_pachner_walk_is_reproducible():
+    a = val(api.pachner_walk(POINCARE, moves=10, seeds=[1, 2], use_cache=False))
+    b = val(api.pachner_walk(POINCARE, moves=10, seeds=[1, 2], use_cache=False))
+    assert a == b and [w["size"] for w in a] == [15, 15] and a[0]["isosig"] != a[1]["isosig"]
+
+
+def test_simplify_greedy_and_exhaustive():
+    walk = val(api.pachner_walk(POINCARE, moves=8, seeds=[3]))
+    r = val(api.simplify_triangulations([walk[0]["isosig"]], trials=2, lookup=True))[0]
+    assert r["input_size"] == 13 and r["final_size"] == 5
+    assert any(n.startswith("SFS [S2: (2,1) (3,1) (5,-4)]") for n in r["census"])
+    # A 9-tetrahedron 3-sphere from E02 of regina_experiments: greedy simplify() never
+    # reduces it; exhaustive search at height 2 does.
+    hard = val(api.simplify_triangulations(["jLLvQPQbeghfifiihxxaaxxjxar"], trials=3,
+                                           max_height=2, target_size=1))[0]
+    assert hard["greedy_best"] == 9 and hard["final_size"] == 1
+    assert [s["height"] for s in hard["exhaustive"]] == [1, 2]

@@ -37,7 +37,7 @@ def command() -> list[str]:
 
 
 _DRIVER = r'''
-import json, math, sys
+import json, math, random, sys, time
 import regina
 
 def tri(sig, dim):
@@ -191,7 +191,70 @@ def normal_surfaces(sig, coords="quad", which="vertex", limit=200):
     return {"count": s.size(), "coords": coords, "which": which,
             "surfaces": rows, "truncated": s.size() > limit}
 
-OPS = {"invariants": invariants, "census_lookup": census_lookup, "hyperbolic": hyperbolic,
+def pachner_walk(sig, moves, seeds, mix44=0):
+    out = []
+    for seed in seeds:
+        rng = random.Random(seed)
+        t = tri(sig, 3)
+        for _ in range(moves):
+            up = [i for i in range(t.countTriangles()) if t.hasPachner(t.triangle(i))]
+            if not up:
+                raise ValueError("no 2-3 move is possible")
+            t.pachner(t.triangle(rng.choice(up)))
+            for _ in range(mix44):
+                flat = [(e, a) for e in range(t.countEdges()) for a in (0, 1)
+                        if t.has44(t.edge(e), a)]
+                if flat:
+                    e, a = rng.choice(flat)
+                    t.move44(t.edge(e), a)
+        out.append({"seed": seed, "isosig": t.isoSig(), "size": t.size()})
+    return out
+
+def simplify_many(sigs, trials=1, max_height=0, target_size=None, threads=1, lookup=False):
+    out = []
+    for sig in sigs:
+        t = tri(sig, 3)
+        rec = {"isosig": sig, "input_size": t.size(), "greedy_sizes": []}
+        best = None
+        for _ in range(max(1, trials)):
+            u = type(t)(t)
+            t0 = time.perf_counter()
+            u.simplify()
+            rec.setdefault("greedy_secs", 0.0)
+            rec["greedy_secs"] += time.perf_counter() - t0
+            rec["greedy_sizes"].append(u.size())
+            if best is None or u.size() < best.size():
+                best = u
+        rec["greedy_best"] = best.size()
+        stages, cur = [], best
+        done = lambda: target_size is not None and cur.size() <= target_size
+        for h in range(1, max_height + 1):
+            if done():
+                break
+            t0 = time.perf_counter()
+            while not done():
+                u = type(cur)(cur)
+                if not u.simplifyExhaustive(h, threads):
+                    break
+                u.simplify()
+                if u.size() >= cur.size():
+                    break
+                cur = u
+            stages.append({"height": h, "size": cur.size(),
+                           "secs": time.perf_counter() - t0})
+        rec["exhaustive"] = stages
+        rec["final_size"] = cur.size()
+        rec["final_isosig"] = cur.isoSig()
+        if lookup:
+            rec["census"] = lookup_names(cur.isoSig())
+        out.append(rec)
+    return out
+
+def lookup_names(sig):
+    return [h.name() for h in regina.Census.lookup(sig)]
+
+OPS = {"pachner_walk": pachner_walk, "simplify_many": simplify_many,
+       "invariants": invariants, "census_lookup": census_lookup, "hyperbolic": hyperbolic,
        "turaev_viro": turaev_viro, "link_invariants": link_invariants,
        "normal_surfaces": normal_surfaces}
 
@@ -259,6 +322,20 @@ def turaev_viro(isosig: str, r: int, timeout: float = 3600) -> dict:
 
 def link_invariants(code, fmt: str = "pd", complement: bool = True, timeout: float = 600) -> dict:
     return _call("link_invariants", {"code": code, "fmt": fmt, "complement": complement}, timeout)
+
+
+def pachner_walk(isosig: str, moves: int, seeds: list[int], mix44: int = 0,
+                 timeout: float = 3600) -> list:
+    return _call("pachner_walk", {"sig": isosig, "moves": moves, "seeds": seeds, "mix44": mix44},
+                 timeout)
+
+
+def simplify_many(isosigs: list[str], trials: int = 1, max_height: int = 0,
+                  target_size: int | None = None, threads: int = 1, lookup: bool = False,
+                  timeout: float = 3600) -> list:
+    return _call("simplify_many", {"sigs": isosigs, "trials": trials, "max_height": max_height,
+                                   "target_size": target_size, "threads": threads,
+                                   "lookup": lookup}, timeout)
 
 
 def normal_surfaces(isosig: str, coords: str = "quad", which: str = "vertex", limit: int = 200,

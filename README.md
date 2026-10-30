@@ -51,6 +51,8 @@ Hessenberg varieties, GKM graphs, face posets). Split out of
 | `turaev_viro` | Regina | exact Turaev-Viro invariants and their values at every root of unity |
 | `link_invariants` | Regina | Jones, HOMFLY-PT, Alexander, complement of a knot/link diagram |
 | `normal_surfaces` | Regina | vertex/fundamental normal surfaces and their topology |
+| `pachner_walk` | Regina | reproducible random 2-3 (and 4-4) moves: scrambled triangulations of the same manifold |
+| `simplify_triangulations` | Regina | batch simplification: repeated greedy `simplify()`, then exhaustive search at increasing height |
 | `hessenberg_betti` | Python | BB Betti numbers of (partial) regular semisimple Hessenberg varieties |
 | `hessenberg_betti_gkm` | Macaulay2 | the same, independently, via GKM |
 | `hessenberg_faces` | Python | face poset: counts by rank, cover invariant |
@@ -63,7 +65,7 @@ Hessenberg varieties, GKM graphs, face posets). Split out of
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 .venv/bin/mte versions
 .venv/bin/mte call hessenberg_betti '{"kbar": [2, 2], "h": [2, 2]}'      # Gr(2,4)
-.venv/bin/pytest                                                           # 37 tests, ~30 s
+.venv/bin/pytest                                                           # 39 tests, ~30 s
 ```
 
 MCP server: `.venv/bin/mtengine-mcp` (stdio transport). For Claude Code, add to the `.mcp.json`
