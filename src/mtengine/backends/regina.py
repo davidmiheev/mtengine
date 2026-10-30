@@ -198,9 +198,12 @@ def pachner_walk(sig, moves, seeds, mix44=0):
         t = tri(sig, 3)
         for _ in range(moves):
             up = [i for i in range(t.countTriangles()) if t.hasPachner(t.triangle(i))]
-            if not up:
-                raise ValueError("no 2-3 move is possible")
-            t.pachner(t.triangle(rng.choice(up)))
+            if up:
+                t.pachner(t.triangle(rng.choice(up)))
+            else:
+                # No 2-3 move (e.g. a one-tetrahedron triangulation, where every triangle
+                # meets the same tetrahedron twice): use a 1-4 move instead.
+                t.pachner(t.tetrahedron(rng.randrange(t.size())))
             for _ in range(mix44):
                 flat = [(e, a) for e in range(t.countEdges()) for a in (0, 1)
                         if t.has44(t.edge(e), a)]

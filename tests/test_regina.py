@@ -124,3 +124,11 @@ def test_simplify_greedy_and_exhaustive():
                                            max_height=2, target_size=1))[0]
     assert hard["greedy_best"] == 9 and hard["final_size"] == 1
     assert [s["height"] for s in hard["exhaustive"]] == [1, 2]
+
+
+def test_pachner_walk_from_one_tetrahedron():
+    # The one-tetrahedron 3-sphere has no 2-3 move; the walk starts with a 1-4 move.
+    w = val(api.pachner_walk("bkaagj", moves=3, seeds=[0]))[0]
+    assert w["size"] == 1 + 3 + 2
+    r = val(api.simplify_triangulations([w["isosig"]], trials=3, max_height=2, target_size=1))[0]
+    assert r["final_size"] == 1

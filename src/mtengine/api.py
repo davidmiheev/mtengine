@@ -141,7 +141,8 @@ def pachner_walk(isosig: str, moves: int, seeds: list[int], mix44: int = 0,
                  timeout: float = 3600, use_cache: bool = True) -> Json:
     """Scramble a 3-manifold triangulation reproducibly: for each seed, `moves` random 2-3
     Pachner moves (each adds a tetrahedron), each followed by `mix44` random 4-4 moves. Returns
-    [{"seed", "isosig", "size"}]. Same manifold, larger and messier triangulation."""
+    [{"seed", "isosig", "size"}]. Same manifold, larger and messier triangulation. Where no 2-3
+    move exists (one-tetrahedron triangulations) a 1-4 move is used, adding three tetrahedra."""
     return core.cached("regina", "pachner_walk",
                        {"sig": isosig, "moves": moves, "seeds": seeds, "mix44": mix44},
                        lambda: regina.pachner_walk(isosig, moves, seeds, mix44, timeout), use_cache)
