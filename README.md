@@ -1,8 +1,8 @@
 # mtengine
 
 An engine for **computational experiments in mathematics**, above all in **topology and
-geometry**: torus actions and GKM theory, matroids, tropical
-geometry, combinatorial topology, and low-dimensional (3- and 4-manifold) topology. It puts one
+geometry**: torus actions and GKM theory, matroids and hyperplane arrangements,
+polytopes and toric geometry, tropical geometry, combinatorial topology, and low-dimensional (3- and 4-manifold) topology. It puts one
 interface — a Python API, the `mte` CLI and an MCP server for AI agents — in front of
 **Macaulay2, gfan, polymake, Singular, nauty, Lean 4/Mathlib and Regina**, and records where
 every result came from, so that an experiment can be cited, re-run and checked.
@@ -13,6 +13,8 @@ every result came from, so that an experiment can be cited, re-run and checked.
 | Commutative algebra, algebraic geometry | Macaulay2, Singular | ideals, Hilbert series, raw scripts |
 | Tropical geometry | gfan | tropical varieties: dimension, lineality, f-vector |
 | Combinatorial topology, polytopes | polymake | simplicial homology with torsion, order complexes of posets |
+| Matroids, oriented matroids, hyperplane arrangements | Python (exact), Macaulay2 | lattice of flats, characteristic/Tutte polynomials, chirotopes, Orlik–Solomon algebras; regions and Betti numbers of complements |
+| Convex and toric geometry | polymake | f- and h-vectors, Ehrhart polynomials, lattice points; Betti numbers of toric varieties and quasitoric manifolds over simple polytopes |
 | Combinatorics | nauty | canonical forms and isomorphism of coloured graphs and posets |
 | Low-dimensional topology | Regina (+ SnapPea) | 3-/4-manifold triangulations, census, hyperbolic structures, Turaev–Viro, knot invariants, normal surfaces, Pachner moves |
 | Formal verification | Lean 4 / Mathlib | compile a proof, list its axioms, flag `sorry` |
@@ -33,7 +35,8 @@ posets) are one application among others, not the scope of the engine.
   ─────────────────────────────────────────────────────────────────
   core: process runner · result cache keyed by (backend, version, input) · provenance · job queue
   backends: macaulay2 · gfan · polymake · singular · nauty · lean · regina
-  domain:   hessenberg (fixed points, BB Betti numbers, GKM graphs, faces) · posets
+  domain:   matroids (flats, arrangements, chirotopes) · hessenberg (fixed points, BB Betti
+            numbers, GKM graphs, faces) · posets
 ```
 
 - **Every result carries provenance**: backend and its version, engine version, function,
@@ -70,6 +73,10 @@ posets) are one application among others, not the scope of the engine.
 | `normal_surfaces` | Regina | vertex/fundamental normal surfaces and their topology |
 | `pachner_walk` | Regina | reproducible random 2-3 (and 4-4) moves: scrambled triangulations of the same manifold |
 | `simplify_triangulations` | Regina | batch simplification: repeated greedy `simplify()`, then exhaustive search at increasing height |
+| `matroid_invariants` | Python | linear matroid of rational vectors: flats, Möbius invariant, characteristic and Poincaré polynomials, beta invariant, circuits; Tutte polynomial and bases (≤ 16 elements); chirotope (`oriented=true`) |
+| `orlik_solomon` | Macaulay2 | Hilbert function of the Orlik–Solomon algebra from the circuits, checked against the Poincaré polynomial from the flats |
+| `hyperplane_arrangement` | Python | central or affine real arrangement: characteristic polynomial, intersection poset, regions and bounded regions (Zaslavsky), Betti numbers of the complexified complement |
+| `polytope_invariants` | polymake | polytope from points or inequalities: f-vector, simple/simplicial, h-vector, dual h-vector, volume, lattice points, Ehrhart polynomial |
 | `hessenberg_betti` | Python | BB Betti numbers of (partial) regular semisimple Hessenberg varieties |
 | `hessenberg_betti_gkm` | Macaulay2 | the same, independently, via GKM |
 | `hessenberg_faces` | Python | face poset: counts by rank, cover invariant |
@@ -82,7 +89,7 @@ posets) are one application among others, not the scope of the engine.
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 .venv/bin/mte versions
 .venv/bin/mte call hessenberg_betti '{"kbar": [2, 2], "h": [2, 2]}'      # Gr(2,4)
-.venv/bin/pytest                                                           # 39 tests, ~30 s
+.venv/bin/pytest                                                           # 53 tests, ~30 s
 ```
 
 MCP server: `.venv/bin/mtengine-mcp` (stdio transport). For Claude Code, add to the `.mcp.json`
@@ -104,16 +111,39 @@ Set `MTENGINE_REGINA_PYTHON` to use another command, e.g. a `python3` that can
 ```sh
 .venv/bin/mte call triangulation_invariants '{"isosig": "cPcbbbiht"}'    # figure-eight complement (m004)
 .venv/bin/mte call link_invariants '{"code": "4 6 2", "format": "dt"}'    # trefoil
+.venv/bin/mte call hyperplane_arrangement '{"normals": [[1,0],[0,1],[1,1]], "constants": [0,0,1]}'
+.venv/bin/mte call polytope_invariants '{"points": [[0,0,0],[1,0,0],[0,1,0],[0,0,1]]}'
 ```
 
-The Lean backend compiles against a Lake project with Mathlib. By default it looks for
-`../formal` next to this checkout, which is where it is inside matroid_toric. Elsewhere, set
-`MTENGINE_LEAN_PROJECT` to the project directory.
+The Lean backend compiles against a Lake project with Mathlib, the first found of:
+
+1. `$MTENGINE_LEAN_PROJECT`;
+2. `../formal` next to this checkout (where it is when mtengine is matroid_toric's `engine/`);
+3. the engine's own project, which `mte lean-init` creates in `$XDG_DATA_HOME/mtengine/lean`
+   (default `~/.local/share/mtengine/lean`): a Lake project that requires Mathlib (default tag
+   `v4.36.0-rc1`, `--mathlib` to change), with the toolchain taken from Mathlib, and the
+   prebuilt Mathlib downloaded (about 5 GB; `--no-cache` skips it). It needs `elan`.
+
+```sh
+.venv/bin/mte lean-init                    # once
+.venv/bin/mte call lean_check '{"source": "import Mathlib\nexample : (2 : ℚ) + 2 = 4 := by norm_num"}'
+```
 
 ## Reproducible toolchain
 
 `Dockerfile` builds Ubuntu 24.04 with every backend at the versions tested here
 (Macaulay2 1.22, gfan 0.6.2, polymake 4.11, Singular 4.3.2, nauty 2.8.8, Lean 4.36.0-rc1 +
-Mathlib, Regina 7.4.1). Build from this repository: `docker build -t mtengine .`. To use the Lean backend,
-mount a Lake project at `/work/formal` (e.g. matroid_toric's `formal/`). The Dockerfile has not
-been test-built yet.
+Mathlib, Regina 7.4.1):
+
+```sh
+docker build -t mtengine .
+docker run --rm mtengine .venv/bin/pytest -q                                  # Lean tests skip
+docker run --rm -v /path/to/matroid_toric/formal:/work/formal mtengine .venv/bin/pytest -q
+docker run -i --rm mtengine                                                   # MCP server, stdio
+```
+
+A Lake project mounted at `/work/formal` is picked up automatically (it is the sibling of the
+checkout at `/work/engine`). `--build-arg WITH_MATHLIB=1` runs `mte lean-init` at build time
+instead, adding about 5 GB of prebuilt Mathlib to the image. Test-built on 2026-11-09: the
+suite passes in the image (51 passed, 2 Lean tests skipped), and the Lean tests pass with
+matroid_toric's `formal/` mounted.

@@ -1,7 +1,11 @@
 # Reproducible toolchain for mtengine. Build from this repository:
 #   docker build -t mtengine .
-# The Lean backend needs a Lake project with Mathlib; mount one at /work/formal, e.g.
+#   docker run --rm mtengine .venv/bin/pytest -q          # the test suite (Lean tests skip)
+#   docker run -i --rm mtengine                            # the MCP server on stdio
+# The Lean backend needs a Lake project with Mathlib. Either mount one at /work/formal, e.g.
 #   docker run -v /path/to/matroid_toric/formal:/work/formal mtengine
+# or bake the engine's own project into the image (adds about 5 GB of prebuilt Mathlib):
+#   docker build --build-arg WITH_MATHLIB=1 -t mtengine .
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,5 +24,8 @@ ENV PATH=/root/.elan/bin:$PATH
 WORKDIR /work/engine
 COPY . .
 RUN python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
-ENV MTENGINE_LEAN_PROJECT=/work/formal
+# /work/formal, if mounted, is found as the sibling of this checkout; otherwise `mte lean-init`'s
+# project in ~/.local/share/mtengine/lean is used.
+ARG WITH_MATHLIB=0
+RUN if [ "$WITH_MATHLIB" = 1 ]; then .venv/bin/mte lean-init; fi
 CMD [".venv/bin/mtengine-mcp"]
