@@ -9,7 +9,7 @@ def val(r):
 
 def test_versions_present():
     v = api.versions()
-    for tool in ["macaulay2", "gfan", "polymake", "singular", "nauty", "lean"]:
+    for tool in ["macaulay2", "gfan", "polymake", "singular", "nauty", "lean", "regina"]:
         assert v[tool] not in ("MISSING", "UNAVAILABLE"), tool
 
 
