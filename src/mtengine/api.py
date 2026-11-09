@@ -8,6 +8,7 @@ from typing import Any
 from . import core
 from .backends import gfan, lean, macaulay2, nauty, polymake, regina, singular
 from .domain import hessenberg as hs
+from .domain import matroids as mt
 from .domain import posets
 
 Json = dict[str, Any]
@@ -176,6 +177,79 @@ def normal_surfaces(isosig: str, coords: str = "quad", which: str = "vertex", li
                        use_cache)
 
 
+# ------------------------------------------------------------------ matroids, arrangements, polytopes
+def _canon(rows: list[list[Any]] | None) -> list[list[str]] | None:
+    """Exact, canonical spelling of rational entries, for cache keys."""
+    from fractions import Fraction
+    return None if rows is None else [[str(Fraction(str(x))) for x in r] for r in rows]
+
+
+def matroid_invariants(vectors: list[list[Any]], tutte_max: int = 16, oriented: bool = False,
+                       use_cache: bool = True) -> Json:
+    """Invariants of the linear matroid of a family of vectors (integer or rational entries,
+    e.g. "1/2"), in exact arithmetic: rank, loops, parallel classes, flats by rank (and the flats
+    themselves when there are at most 500), Moebius invariant, characteristic and Poincare
+    polynomials (coefficient lists, lowest degree first), beta invariant; for at most tutte_max
+    elements also the Tutte polynomial ({"i,j": coefficient of x^i y^j}), independent sets by
+    size and the number of bases; circuits; with oriented=True the chirotope (signs of maximal
+    minors, the oriented matroid of the configuration)."""
+    V = _canon(vectors)
+    def compute():
+        W = mt.parse_vectors(V)
+        out = mt.invariants(W, tutte_max=tutte_max)
+        out["circuits"] = mt.circuits(W) if len(W) <= 30 else None
+        if oriented:
+            out["chirotope"] = mt.chirotope(W)
+        return out
+    return core.cached("python", "matroid_invariants",
+                       {"v": V, "tutte_max": tutte_max, "oriented": oriented}, compute, use_cache)
+
+
+def orlik_solomon(vectors: list[list[Any]], timeout: float = 1800, use_cache: bool = True) -> Json:
+    """Hilbert function of the Orlik-Solomon algebra of the linear matroid of the vectors,
+    computed in Macaulay2 as the exterior algebra modulo the boundaries of the circuits, next to
+    the Poincare polynomial from the lattice of flats. The two routes share only the circuits;
+    `agrees` says whether they match (the Orlik-Solomon theorem says they must)."""
+    V = _canon(vectors)
+    def compute():
+        W = mt.parse_vectors(V)
+        C = mt.circuits(W)
+        h = macaulay2.orlik_solomon_hilbert(len(W), C, timeout)
+        pi = mt.invariants(W, tutte_max=-1)["poincare_polynomial"]
+        while pi and pi[-1] == 0:
+            pi.pop()
+        return {"hilbert_function": h, "poincare_polynomial": pi, "agrees": h == pi,
+                "n_circuits": len(C)}
+    return core.cached("macaulay2", "orlik_solomon", {"v": V}, compute, use_cache)
+
+
+def hyperplane_arrangement(normals: list[list[Any]], constants: list[Any] | None = None,
+                           use_cache: bool = True) -> Json:
+    """Real hyperplane arrangement {x : a_i . x = b_i} in R^d, central if constants is omitted:
+    characteristic polynomial (lowest degree first), intersection poset by rank, numbers of
+    regions and of bounded regions (Zaslavsky), and the Betti numbers of the complement of the
+    complexified arrangement (Orlik-Solomon). Repeated hyperplanes count once."""
+    A = _canon(normals)
+    b = None if constants is None else [r[0] for r in _canon([[x] for x in constants])]
+    return core.cached("python", "hyperplane_arrangement", {"a": A, "b": b},
+                       lambda: mt.arrangement(A, b), use_cache)
+
+
+def polytope_invariants(points: list[list[Any]] | None = None,
+                        inequalities: list[list[Any]] | None = None,
+                        equations: list[list[Any]] | None = None, timeout: float = 3600,
+                        use_cache: bool = True) -> Json:
+    """Convex polytope (polymake) from points, or from inequalities [b, a_1..a_d] meaning
+    b + a.x >= 0 (and optional equations in the same form): dimension, vertices, f-vector,
+    simple/simplicial, h-vector (simplicial), h-vector of the dual (simple: the even Betti
+    numbers of a toric variety or quasitoric manifold over it), volume (full-dimensional), and
+    for lattice polytopes lattice points, interior lattice points, Ehrhart polynomial (lowest
+    degree first) and normalized volume."""
+    P, I, E = _canon(points), _canon(inequalities), _canon(equations)
+    return core.cached("polymake", "polytope", {"p": P, "i": I, "e": E},
+                       lambda: polymake.polytope(P, I, E, timeout), use_cache)
+
+
 # ------------------------------------------------------------------ Hessenberg varieties
 def hessenberg_betti(kbar: list[int], h: list[int], use_cache: bool = True) -> Json:
     """Betti numbers (beta_0, beta_2, ...) of the regular semisimple partial Hessenberg variety
@@ -252,6 +326,7 @@ FUNCTIONS = {f.__name__: f for f in [
     versions, m2_run, singular_run, gkm_betti, tropical_variety, simplicial_homology,
     graph_canonical_form, lean_check, regina_run, triangulation_invariants, census_lookup,
     hyperbolic_structure, turaev_viro, link_invariants, normal_surfaces, pachner_walk,
-    simplify_triangulations, hessenberg_betti,
+    simplify_triangulations, matroid_invariants, orlik_solomon, hyperplane_arrangement,
+    polytope_invariants, hessenberg_betti,
     hessenberg_betti_gkm, hessenberg_faces, hessenberg_face_poset_canonical,
     hessenberg_face_poset_homology, job_submit, job_status]}
