@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mtengine"
 version = "0.1.0"
-description = "Computational engine for torus actions, matroids and GKM theory: one interface to Macaulay2, gfan, polymake, Singular, nauty, Lean/Mathlib and Regina"
+description = "Engine for computational experiments in mathematics, especially topology and geometry: one interface (Python API, CLI, MCP server) to Macaulay2, gfan, polymake, Singular, nauty, Lean/Mathlib and Regina, with provenance"
 requires-python = ">=3.11"
 dependencies = ["mcp>=2.3"]
 

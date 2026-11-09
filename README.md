@@ -1,10 +1,27 @@
 # mtengine
 
-One interface to the tools of the matroid_toric project: **Macaulay2, gfan, polymake, Singular,
-nauty, Lean 4/Mathlib, Regina**, plus the project's own mathematics (regular semisimple and partial
-Hessenberg varieties, GKM graphs, face posets). Split out of
-[matroid_toric](https://github.com/davidmiheev/matroid_toric), which uses it as a git submodule at
-`engine/`; the history of `engine/` is preserved here.
+An engine for **computational experiments in mathematics**, above all in **topology and
+geometry**: torus actions and GKM theory, matroids, tropical
+geometry, combinatorial topology, and low-dimensional (3- and 4-manifold) topology. It puts one
+interface — a Python API, the `mte` CLI and an MCP server for AI agents — in front of
+**Macaulay2, gfan, polymake, Singular, nauty, Lean 4/Mathlib and Regina**, and records where
+every result came from, so that an experiment can be cited, re-run and checked.
+
+| Area | Backends | Typical use |
+|---|---|---|
+| Equivariant topology, GKM theory | Macaulay2, Python | Betti numbers from GKM graphs; Hessenberg varieties, their face posets |
+| Commutative algebra, algebraic geometry | Macaulay2, Singular | ideals, Hilbert series, raw scripts |
+| Tropical geometry | gfan | tropical varieties: dimension, lineality, f-vector |
+| Combinatorial topology, polytopes | polymake | simplicial homology with torsion, order complexes of posets |
+| Combinatorics | nauty | canonical forms and isomorphism of coloured graphs and posets |
+| Low-dimensional topology | Regina (+ SnapPea) | 3-/4-manifold triangulations, census, hyperbolic structures, Turaev–Viro, knot invariants, normal surfaces, Pachner moves |
+| Formal verification | Lean 4 / Mathlib | compile a proof, list its axioms, flag `sorry` |
+
+It started as the engine of [matroid_toric](https://github.com/davidmiheev/matroid_toric) (the
+working repository for the paper *Face posets, local weight matroids and Betti numbers of torus
+actions*), which still uses it as a git submodule at `engine/`; the history of `engine/` is
+preserved here. The domain modules for that project (Hessenberg varieties, GKM graphs, face
+posets) are one application among others, not the scope of the engine.
 
 ## Design
 

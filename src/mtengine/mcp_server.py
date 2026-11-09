@@ -13,10 +13,10 @@ from . import api
 server = MCPServer(
     name="mtengine",
     version=api.core.__version__,
-    instructions=("Computational engine for torus actions, matroids and GKM theory, plus "
-                  "low-dimensional topology via Regina (triangulations as isomorphism signatures). "
-                  "Results come "
-                  "with provenance (backend version, input hash, time) and are cached. For anything "
+    instructions=("Engine for computational experiments in mathematics, especially topology and "
+                  "geometry: torus actions and GKM theory, matroids, tropical geometry, combinatorial "
+                  "topology, and low-dimensional topology via Regina (triangulations as isomorphism "
+                  "signatures). Results come with provenance (backend version, input hash, time) and are cached. For anything "
                   "slow use job_submit + job_status."),
 )
 for _name, _fn in api.FUNCTIONS.items():
