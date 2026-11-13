@@ -13,7 +13,7 @@ every result came from, so that an experiment can be cited, re-run and checked.
 | Commutative algebra, algebraic geometry | Macaulay2, Singular | ideals, Hilbert series, raw scripts |
 | Tropical geometry | gfan | tropical varieties: dimension, lineality, f-vector |
 | Combinatorial topology, polytopes | polymake | simplicial homology with torsion, order complexes of posets |
-| Matroids, oriented matroids, hyperplane arrangements | Python (exact), Macaulay2 | lattice of flats, characteristic/Tutte polynomials, chirotopes, Orlik–Solomon algebras; regions and Betti numbers of complements |
+| Matroids, oriented matroids, hyperplane arrangements | Python (exact), Macaulay2 | lattice of flats, characteristic/Tutte polynomials, chirotopes and reorientation classes, Orlik–Solomon algebras, Chow rings and augmented Chow rings, Kazhdan–Lusztig polynomials; regions and Betti numbers of complements |
 | Convex and toric geometry | polymake | f- and h-vectors, Ehrhart polynomials, lattice points; Betti numbers of toric varieties and quasitoric manifolds over simple polytopes |
 | Combinatorics | nauty | canonical forms and isomorphism of coloured graphs and posets |
 | Low-dimensional topology | Regina (+ SnapPea) | 3-/4-manifold triangulations, census, hyperbolic structures, Turaev–Viro, knot invariants, normal surfaces, Pachner moves |
@@ -75,6 +75,9 @@ posets) are one application among others, not the scope of the engine.
 | `simplify_triangulations` | Regina | batch simplification: repeated greedy `simplify()`, then exhaustive search at increasing height |
 | `matroid_invariants` | Python | linear matroid of rational vectors: flats, Möbius invariant, characteristic and Poincaré polynomials, beta invariant, circuits; Tutte polynomial and bases (≤ 16 elements); chirotope (`oriented=true`) |
 | `orlik_solomon` | Macaulay2 | Hilbert function of the Orlik–Solomon algebra from the circuits, checked against the Poincaré polynomial from the flats |
+| `oriented_matroid` | Python | oriented matroid of a real vector configuration: chirotope, signed circuits, acyclic / totally cyclic, topes and the set of attainable Morse indices; canonical forms up to relabelling and up to reorientation (≤ 7 elements) |
+| `kazhdan_lusztig` | Python | Kazhdan–Lusztig polynomial and Z-polynomial (Hilbert series of the intersection cohomology module) of a linear matroid, from the lattice of flats |
+| `chow_ring` | Macaulay2 | Hilbert function of the Chow ring or (`augmented=true`) the augmented Chow ring from its presentation, checked against the Feichtner–Yuzvinsky basis count from the flats |
 | `hyperplane_arrangement` | Python | central or affine real arrangement: characteristic polynomial, intersection poset, regions and bounded regions (Zaslavsky), Betti numbers of the complexified complement |
 | `polytope_invariants` | polymake | polytope from points or inequalities: f-vector, simple/simplicial, h-vector, dual h-vector, volume, lattice points, Ehrhart polynomial |
 | `hessenberg_betti` | Python | BB Betti numbers of (partial) regular semisimple Hessenberg varieties |
@@ -89,7 +92,7 @@ posets) are one application among others, not the scope of the engine.
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 .venv/bin/mte versions
 .venv/bin/mte call hessenberg_betti '{"kbar": [2, 2], "h": [2, 2]}'      # Gr(2,4)
-.venv/bin/pytest                                                           # 53 tests, ~30 s
+.venv/bin/pytest                                                           # 69 tests, a few minutes
 ```
 
 MCP server: `.venv/bin/mtengine-mcp` (stdio transport). For Claude Code, add to the `.mcp.json`

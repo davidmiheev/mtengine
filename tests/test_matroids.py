@@ -99,3 +99,63 @@ def test_h_description_and_rationals():
     r = val(api.polytope_invariants(points=[[0, 0], [1, 0], [0, "1/2"]]))
     assert not r["lattice"] and r["volume"] == "1/4"
     assert val(api.polytope_invariants(inequalities=[[-1, 1], [-1, -1]])) == {"feasible": False}
+
+
+# ---- Kazhdan-Lusztig polynomials, Chow rings, oriented matroids
+def uniform(m, n):
+    """U_{m,n}: n points on the moment curve in dimension m."""
+    return [[(j + 1) ** i for i in range(m)] for j in range(n)]
+
+
+@pytest.mark.parametrize("vectors, kl", [
+    (uniform(2, 3), [1]), (uniform(3, 4), [1, 2]), (uniform(4, 5), [1, 5]), (uniform(5, 6), [1, 9, 5]),
+    (braid(4), [1, 1]), (braid(5), [1, 5]), (braid(6), [1, 16, 15]),      # Elias-Proudfoot-Wakefield
+    ([[1, 0, 0], [0, 1, 0], [0, 0, 1]], [1]),
+])
+def test_kazhdan_lusztig_known_values(vectors, kl):
+    r = val(api.kazhdan_lusztig(vectors))
+    assert r["kl_polynomial"] == kl
+    assert r["z_palindromic"] and len(r["z_polynomial"]) == r["rank"] + 1
+
+
+def test_z_polynomial_boolean_and_braid():
+    assert val(api.kazhdan_lusztig([[1, 0, 0], [0, 1, 0], [0, 0, 1]]))["z_polynomial"] == [1, 3, 3, 1]
+    assert val(api.kazhdan_lusztig(braid(4)))["z_polynomial"] == [1, 7, 7, 1]
+
+
+@pytest.mark.parametrize("vectors, chow, aug", [
+    ([[1, 0, 0], [0, 1, 0], [0, 0, 1]], [1, 4, 1], [1, 7, 7, 1]),   # permutohedron, stellahedron
+    ([[1, 0], [0, 1]], [1, 1], [1, 3, 1]),
+    (braid(4), [1, 8, 1], [1, 14, 14, 1]),
+    (uniform(3, 4), [1, 7, 1], [1, 11, 11, 1]),
+])
+def test_chow_rings(vectors, chow, aug):
+    a = val(api.chow_ring(vectors))
+    b = val(api.chow_ring(vectors, augmented=True))
+    assert a["hilbert_function"] == chow and a["agrees"] and a["palindromic"]
+    assert b["hilbert_function"] == aug and b["agrees"] and b["palindromic"]
+
+
+def test_chow_ring_rejects_loops():
+    with pytest.raises(Exception):
+        api.chow_ring([[0, 0], [1, 0]], use_cache=False)
+
+
+def test_oriented_matroid_acyclic_and_cyclic():
+    a = val(api.oriented_matroid([[1, 0], [0, 1], [1, 1]]))          # in a half-plane
+    b = val(api.oriented_matroid([[1, 0], [0, 1], [-1, -1]]))        # around the origin
+    assert a["acyclic"] and not a["totally_cyclic"] and a["index_set"] == [0, 1, 2, 3]
+    assert b["totally_cyclic"] and not b["acyclic"] and b["index_set"] == [1, 2]
+    assert a["n_topes"] == b["n_topes"] == 6
+    assert a["oriented_class"] != b["oriented_class"]
+    assert a["reorientation_class"] == b["reorientation_class"]      # same lines
+
+
+def test_oriented_matroid_reorientation_classes_u36():
+    """Six lines in general position in R^3: points on a conic and a pentagon with its centre
+    give different reorientation classes of U_{3,6}."""
+    conic = [[1, t, t * t] for t in range(6)]
+    pent = [[1, 0, 0], [1, 4, 0], [1, 5, 4], [1, 2, 7], [1, -2, 3], [1, 2, 3]]
+    a, b = val(api.oriented_matroid(conic)), val(api.oriented_matroid(pent))
+    assert a["rank"] == b["rank"] == 3
+    assert a["reorientation_class"] != b["reorientation_class"]
