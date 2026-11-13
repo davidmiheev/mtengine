@@ -79,13 +79,22 @@ def test_singular():
     assert out.strip() == "5"
 
 
-# ---- Lean
+# ---- Lean (needs a Lake project with Mathlib: matroid_toric's formal/ or `mte lean-init`)
+from mtengine.backends import lean as _lean
+
+needs_lean = pytest.mark.skipif(_lean.project() is None, reason="no Lean project")
+needs_formal = pytest.mark.skipif(_lean.project() is None or not (_lean.project() / "Formal.lean").exists(),
+                                  reason="needs matroid_toric's formal/ project")
+
+
+@needs_formal
 def test_lean_g2_is_sorry_free():
     r = val(api.lean_check("import Formal", ["MatroidToric.span_prod_eq_iff", "MatroidToric.vectorMatroid_indep_iff"]))
     assert r["ok"] and not r["uses_sorry"]
     assert set(r["axioms"]["MatroidToric.span_prod_eq_iff"]) == {"propext", "Classical.choice", "Quot.sound"}
 
 
+@needs_lean
 def test_lean_detects_sorry_and_errors():
     r = val(api.lean_check("theorem t : 1 + 1 = 3 := by sorry", ["t"]))
     assert r["uses_sorry"] == ["t"]
@@ -110,3 +119,19 @@ def test_job_queue():
             break
         time.sleep(0.1)
     assert st["state"] == "done" and st["result"]["value"] == [1, 2, 2, 1]
+
+
+def test_lean_project_resolution(tmp_path, monkeypatch):
+    from mtengine.backends import lean
+    monkeypatch.setenv("MTENGINE_LEAN_PROJECT", str(tmp_path / "x" / ".." / "p"))
+    assert lean.project() == (tmp_path / "p").resolve()                # env var wins, made absolute
+    monkeypatch.delenv("MTENGINE_LEAN_PROJECT")
+    monkeypatch.setattr(lean, "SIBLING_PROJECT", tmp_path / "formal")
+    monkeypatch.setattr(lean, "DATA_PROJECT", tmp_path / "data")
+    assert lean.project() is None and lean.version().startswith("MISSING")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "lean-toolchain").write_text("leanprover/lean4:v4.36.0-rc1\n")
+    assert lean.project() == tmp_path / "data"                         # `mte lean-init` default
+    (tmp_path / "formal").mkdir()
+    (tmp_path / "formal" / "lean-toolchain").write_text("leanprover/lean4:v4.36.0-rc1\n")
+    assert lean.project() == tmp_path / "formal"                       # matroid_toric layout first

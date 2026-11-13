@@ -1,4 +1,5 @@
-"""Command line: `mte list`, `mte versions`, `mte call <function> '<json arguments>'`."""
+"""Command line: `mte list`, `mte versions`, `mte call <function> '<json arguments>'`,
+`mte lean-init [DIR]` (set up a Lake project with Mathlib for lean_check)."""
 from __future__ import annotations
 
 import argparse
@@ -19,7 +20,18 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("call", help="call a function with JSON keyword arguments")
     c.add_argument("function")
     c.add_argument("arguments", nargs="?", default="{}")
+    li = sub.add_parser("lean-init", help="create a Lake project with Mathlib for lean_check")
+    li.add_argument("directory", nargs="?", help="default: $XDG_DATA_HOME/mtengine/lean")
+    li.add_argument("--mathlib", default=None, help="Mathlib tag or commit (default: %(default)s)")
+    li.add_argument("--no-cache", action="store_true", help="skip `lake exe cache get`")
     a = p.parse_args(argv)
+    if a.cmd == "lean-init":
+        from .backends import lean
+        r = lean.init(a.directory, a.mathlib or lean.DEFAULT_MATHLIB, not a.no_cache)
+        print(json.dumps(r, indent=2))
+        if a.directory and a.directory != str(lean.DATA_PROJECT):
+            print(f"set MTENGINE_LEAN_PROJECT={r['project']} to use it", file=sys.stderr)
+        return 0
     if a.cmd == "list":
         for name, f in api.FUNCTIONS.items():
             doc = (inspect.getdoc(f) or "").splitlines()[0]

@@ -1,4 +1,7 @@
-"""mtengine: one interface to the tools used in the matroid_toric project.
+"""mtengine: an engine for computational experiments in topology and geometry.
+
+One interface to Macaulay2, gfan, polymake, Singular, nauty, Lean and Regina; it began as the
+engine of the matroid_toric project.
 
 Layers:
   core      -- process runner, content-addressed result cache with provenance, job queue
