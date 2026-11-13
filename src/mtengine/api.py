@@ -223,6 +223,55 @@ def orlik_solomon(vectors: list[list[Any]], timeout: float = 1800, use_cache: bo
     return core.cached("macaulay2", "orlik_solomon", {"v": V}, compute, use_cache)
 
 
+def oriented_matroid(vectors: list[list[Any]], canon_max: int = 7, use_cache: bool = True) -> Json:
+    """The oriented matroid of a real vector configuration: chirotope, signed circuits, whether
+    it is acyclic (the vectors lie in an open half-space) or totally cyclic, the number of topes
+    and the set of numbers of negative signs over the topes (for the tangent weights at a fixed
+    point of a torus action: the Morse indices the point can have for a generic circle), and,
+    for at most canon_max elements, canonical forms up to relabelling (`oriented_class`) and up
+    to relabelling and reorientation (`reorientation_class`)."""
+    V = _canon(vectors)
+    def compute():
+        W = mt.parse_vectors(V)
+        out = mt.oriented(W, canon_max=canon_max)
+        out["chirotope"] = mt.chirotope(W)["chirotope"]
+        out["signed_circuits"] = [{str(e): s for e, s in C.items()} for C in mt.signed_circuits(W)]
+        return out
+    return core.cached("python", "oriented_matroid", {"v": V, "canon_max": canon_max}, compute, use_cache)
+
+
+def kazhdan_lusztig(vectors: list[list[Any]], use_cache: bool = True) -> Json:
+    """Kazhdan-Lusztig polynomial P_M(t) and Z-polynomial Z_M(t) of the linear matroid of the
+    vectors (coefficient lists, lowest degree first), from the lattice of flats. Z_M is the
+    Hilbert series of the intersection cohomology module IH(M) of Braden, Huh, Matherne,
+    Proudfoot and Wang; it is palindromic of degree rank(M)."""
+    V = _canon(vectors)
+    return core.cached("python", "kazhdan_lusztig", {"v": V},
+                       lambda: mt.kazhdan_lusztig(mt.parse_vectors(V)), use_cache)
+
+
+def chow_ring(vectors: list[list[Any]], augmented: bool = False, timeout: float = 1800,
+              use_cache: bool = True) -> Json:
+    """Hilbert function of the Chow ring A(M) of the linear matroid of the vectors (maximal
+    building set, Adiprasito-Huh-Katz), or with augmented=True of the augmented Chow ring
+    (Braden-Huh-Matherne-Proudfoot-Wang). Computed in Macaulay2 from the presentation, next to
+    the count of the Feichtner-Yuzvinsky monomial basis from the lattice of flats; `agrees`
+    says whether the two match. Loops are not allowed; parallel elements are."""
+    V = _canon(vectors)
+    def compute():
+        W = mt.parse_vectors(V)
+        levels = mt.flats_by_rank(W)
+        if levels[0][0]:
+            raise core.EngineError("the matroid has a loop (a zero vector); remove it first")
+        flats = [sorted(F) for level in levels for F in level]
+        h = macaulay2.chow_ring_hilbert(len(W), flats, sorted(levels[-1][0]), augmented, timeout)
+        fy = mt.chow_hilbert_series(W, augmented)
+        return {"rank": len(levels) - 1, "augmented": augmented, "hilbert_function": h,
+                "feichtner_yuzvinsky_count": fy, "agrees": h == fy,
+                "palindromic": h == h[::-1], "total_dimension": sum(h), "n_flats": len(flats)}
+    return core.cached("macaulay2", "chow_ring", {"v": V, "aug": augmented}, compute, use_cache)
+
+
 def hyperplane_arrangement(normals: list[list[Any]], constants: list[Any] | None = None,
                            use_cache: bool = True) -> Json:
     """Real hyperplane arrangement {x : a_i . x = b_i} in R^d, central if constants is omitted:
@@ -326,7 +375,8 @@ FUNCTIONS = {f.__name__: f for f in [
     versions, m2_run, singular_run, gkm_betti, tropical_variety, simplicial_homology,
     graph_canonical_form, lean_check, regina_run, triangulation_invariants, census_lookup,
     hyperbolic_structure, turaev_viro, link_invariants, normal_surfaces, pachner_walk,
-    simplify_triangulations, matroid_invariants, orlik_solomon, hyperplane_arrangement,
+    simplify_triangulations, matroid_invariants, orlik_solomon, oriented_matroid, kazhdan_lusztig, chow_ring,
+    hyperplane_arrangement,
     polytope_invariants, hessenberg_betti,
     hessenberg_betti_gkm, hessenberg_faces, hessenberg_face_poset_canonical,
     hessenberg_face_poset_homology, job_submit, job_status]}
