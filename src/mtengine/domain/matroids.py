@@ -238,6 +238,242 @@ def chirotope(V: Sequence[Vec], limit: int = 20000) -> dict:
     return {"rank": r, "order": "lexicographic r-subsets of 0..n-1", "chirotope": "".join(signs)}
 
 
+def _nullvector(V: Sequence[Vec], C: Sequence[int]) -> list[Fraction]:
+    """The dependency of a circuit C: coefficients c with sum c_j V[C[j]] = 0, c[0] = 1."""
+    d = len(V[0])
+    k = len(C)
+    # solve sum_{j>=1} c_j V[C[j]] = -V[C[0]] by elimination on the d x (k-1 | 1) system
+    A = [[V[C[j]][i] for j in range(1, k)] + [-V[C[0]][i]] for i in range(d)]
+    row = 0
+    piv = []
+    for c in range(k - 1):
+        p = next((i for i in range(row, d) if A[i][c]), None)
+        if p is None:
+            continue
+        A[row], A[p] = A[p], A[row]
+        A[row] = [x / A[row][c] for x in A[row]]
+        for i in range(d):
+            if i != row and A[i][c]:
+                f = A[i][c]
+                A[i] = [a - f * b for a, b in zip(A[i], A[row])]
+        piv.append(c)
+        row += 1
+    out = [Fraction(1)] + [Fraction(0)] * (k - 1)
+    for i, c in enumerate(piv):
+        out[c + 1] = A[i][-1]
+    return out
+
+
+def signed_circuits(V: Sequence[Vec]) -> list[dict[int, int]]:
+    """Signed circuits {element: +1 or -1}, one of each opposite pair (the first element +)."""
+    out = []
+    for C in circuits(V):
+        c = _nullvector(V, C)
+        out.append({e: (1 if x > 0 else -1) for e, x in zip(C, c)})
+    return out
+
+
+def _chirotope_map(V: Sequence[Vec]) -> tuple[int, dict[tuple[int, ...], int]]:
+    n, d = len(V), len(V[0])
+    ech, rows = _Echelon(), []
+    for i in range(d):
+        if ech.add([v[i] for v in V]):
+            rows.append(i)
+    r = len(rows)
+    chi = {}
+    for B in combinations(range(n), r):
+        x = _det([[V[j][i] for j in B] for i in rows]) if r else Fraction(1)
+        chi[B] = 1 if x > 0 else -1 if x < 0 else 0
+    return r, chi
+
+
+def _perm_sign(seq: Sequence[int]) -> int:
+    s, seq = 1, list(seq)
+    for i in range(len(seq)):
+        for j in range(i + 1, len(seq)):
+            if seq[i] > seq[j]:
+                s = -s
+    return s
+
+
+def oriented(V: Sequence[Vec], canon_max: int = 7) -> dict:
+    """The oriented matroid of a real vector configuration.
+
+    acyclic: the vectors lie in an open half-space (no positive circuit); totally_cyclic: every
+    element lies in a positive circuit (the origin is in the relative interior of the convex
+    hull). index_set: the numbers of vectors on the negative side of a generic hyperplane, over
+    all generic hyperplanes (for tangent weights at a fixed point: the Morse indices the point
+    can have for a generic circle). For at most canon_max elements, two canonical chirotopes:
+    `oriented_class` up to relabelling (and the global sign), and `reorientation_class` up to
+    relabelling and reversing the signs of any elements. Two configurations have isomorphic
+    oriented matroids iff the first agree, and are reorientation equivalent iff the second do."""
+    from itertools import permutations, product
+    n = len(V)
+    r, chi = _chirotope_map(V)
+    sc = signed_circuits(V)
+    positive = [C for C in sc if len(set(C.values())) == 1]
+    covered = set().union(*[set(C) for C in positive]) if positive else set()
+    # topes: sign vectors of generic functionals = sign vectors orthogonal to no signed circuit
+    # (a sign vector is a tope iff no circuit is conformal with it up to sign)
+    index_set = None
+    n_topes = None
+    if n <= 16 and not any(len(C) == 1 for C in sc):
+        par = [C for C in sc if len(C) == 2]                 # parallel pairs force signs
+        idx = set()
+        cnt = 0
+        for signs in product((1, -1), repeat=n):
+            ok = True
+            for C in sc:
+                vals = {signs[e] * s for e, s in C.items()}
+                if len(vals) == 1:                           # sum of positive multiples cannot vanish
+                    ok = False
+                    break
+            if ok:
+                cnt += 1
+                idx.add(sum(1 for x in signs if x < 0))
+        index_set, n_topes = sorted(idx), cnt
+    out = {"n": n, "rank": r, "acyclic": not positive, "totally_cyclic": len(covered) == n and n > 0,
+           "n_positive_circuits": len(positive), "n_topes": n_topes, "index_set": index_set,
+           "oriented_class": None, "reorientation_class": None}
+    if n <= canon_max:
+        bases = list(combinations(range(n), r))
+        sym = {1: "+", -1: "-", 0: "0"}
+        best_o = best_r = None
+        for perm in permutations(range(n)):
+            img = []
+            for B in bases:                                  # chi'(B) = chi(perm(B)), sorted
+                PB = [perm[b] for b in B]
+                img.append(_perm_sign(PB) * chi[tuple(sorted(PB))])
+            for g in (1, -1):
+                cand = tuple(g * x for x in img)
+                if best_o is None or cand > best_o:
+                    best_o = cand
+            for eps in product((1, -1), repeat=n):
+                cand = []
+                for B, x in zip(bases, img):
+                    for b in B:
+                        x *= eps[b]
+                    cand.append(x)
+                cand = tuple(cand)
+                if best_r is None or cand > best_r:
+                    best_r = cand
+        out["oriented_class"] = "".join(sym[x] for x in best_o)
+        out["reorientation_class"] = "".join(sym[x] for x in best_r)
+    return out
+
+
+# ------------------------------------------------------------------ Kazhdan-Lusztig theory
+def _padd(a: list[int], b: list[int], sign: int = 1) -> list[int]:
+    out = [0] * max(len(a), len(b))
+    for i, x in enumerate(a):
+        out[i] += x
+    for i, x in enumerate(b):
+        out[i] += sign * x
+    return out
+
+
+def _pmul(a: list[int], b: list[int]) -> list[int]:
+    if not a or not b:
+        return []
+    out = [0] * (len(a) + len(b) - 1)
+    for i, x in enumerate(a):
+        if x:
+            for j, y in enumerate(b):
+                out[i + j] += x * y
+    return out
+
+
+def _trim(a: list[int]) -> list[int]:
+    a = list(a)
+    while len(a) > 1 and a[-1] == 0:
+        a.pop()
+    return a or [0]
+
+
+def kazhdan_lusztig(V: Sequence[Vec], max_flats: int = 1500) -> dict:
+    """Kazhdan-Lusztig polynomial P_M(t) and Z-polynomial Z_M(t) of the linear matroid of V
+    (Elias-Proudfoot-Wakefield; Proudfoot-Xu-Young), coefficient lists, lowest degree first.
+
+    P is defined by P = 1 in rank 0, deg P < rank/2 in positive rank, and
+    t^rank P_M(1/t) = sum over flats F of chi_{M|F}(t) P_{M/F}(t); it is computed for every
+    upper interval of the lattice of flats. Z_M(t) = sum_F t^rank(F) P_{M/F}(t) is palindromic
+    of degree rank and is the Hilbert series of the intersection cohomology module IH(M) of
+    Braden-Huh-Matherne-Proudfoot-Wang (with t of degree 2). Loops are ignored and parallel
+    elements identified, as both polynomials depend only on the lattice of flats."""
+    levels = flats_by_rank(V)
+    r = len(levels) - 1
+    flats = [F for level in levels for F in level]
+    if len(flats) > max_flats:
+        raise EngineError(f"{len(flats)} flats, over the limit {max_flats}")
+    rk = {F: k for k, level in enumerate(levels) for F in level}
+    above = {F: [G for G in flats if F < G] for F in flats}
+    mu: dict[tuple[frozenset[int], frozenset[int]], int] = {}
+    for F in flats:                                  # mu(F, G) for G >= F, by increasing rank
+        mu[F, F] = 1
+        for G in above[F]:                           # `flats` is sorted by rank
+            mu[F, G] = -sum(mu[F, H] for H in flats if (H == F or F < H) and H < G)
+    top = levels[-1][0]
+
+    def chi(F, G):                                   # characteristic polynomial of [F, G]
+        d = rk[G] - rk[F]
+        out = [0] * (d + 1)
+        for H in flats:
+            if (H == F or F < H) and (H == G or H < G):
+                out[rk[G] - rk[H]] += mu[F, H]
+        return out
+
+    P: dict[frozenset[int], list[int]] = {}          # P of the interval [F, top]
+    for F in reversed(flats):                        # decreasing rank
+        d = r - rk[F]
+        if d == 0:
+            P[F] = [1]
+            continue
+        Q: list[int] = []
+        for G in above[F]:
+            Q = _padd(Q, _pmul(chi(F, G), P[G]))
+        # t^d P(1/t) - P(t) = Q(t), deg P < d/2
+        p = [-(Q[i] if i < len(Q) else 0) for i in range((d + 1) // 2)]
+        for i in range(d + 1):                       # consistency of the defining recursion
+            q = Q[i] if i < len(Q) else 0
+            want = (p[d - i] if d - i < len(p) else 0) - (p[i] if i < len(p) else 0)
+            if q != want:
+                raise EngineError("Kazhdan-Lusztig recursion is inconsistent (internal error)")
+        P[F] = _trim(p)
+    Z: list[int] = []
+    for F in flats:
+        Z = _padd(Z, [0] * rk[F] + P[F])
+    Z = _trim(Z) + [0] * (r + 1 - len(_trim(Z)))
+    bottom = levels[0][0]
+    return {"rank": r, "n_flats": len(flats), "kl_polynomial": P[bottom], "z_polynomial": Z,
+            "z_palindromic": Z == Z[::-1], "ih_total_dimension": sum(Z)}
+
+
+def chow_hilbert_series(V: Sequence[Vec], augmented: bool = False) -> list[int]:
+    """Hilbert function of the Chow ring (or augmented Chow ring) of the linear matroid of V,
+    from the Feichtner-Yuzvinsky basis: a sum over chains of flats F_1 < ... < F_k of
+    prod_i (t + ... + t^(rk F_i - rk F_{i-1} - 1)), with F_0 the bottom flat; in the augmented
+    case the first factor is t + ... + t^(rk F_1) instead."""
+    levels = flats_by_rank(V)
+    r = len(levels) - 1
+    flats = [F for level in levels for F in level]
+    rk = {F: k for k, level in enumerate(levels) for F in level}
+    w = lambda d: [0] + [1] * max(d - 1, 0)          # t + ... + t^(d-1)
+    f: dict[frozenset[int], list[int]] = {}
+    total = [1]
+    for F in flats:
+        if rk[F] == 0:
+            f[F] = [0]
+            continue
+        acc = w(rk[F] + 1) if augmented else w(rk[F])
+        for G in flats:
+            if G < F and rk[G] > 0:
+                acc = _padd(acc, _pmul(f[G], w(rk[F] - rk[G])))
+        f[F] = acc
+        total = _padd(total, acc)
+    total = _trim(total)
+    return total + [0] * (r + 1 - len(total)) if augmented else total
+
+
 # ------------------------------------------------------------------ hyperplane arrangements
 def arrangement(normals: Sequence[Sequence[Any]], constants: Sequence[Any] | None = None) -> dict:
     """Invariants of the real arrangement {a_i . x = b_i} in R^d (central when constants is None).

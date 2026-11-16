@@ -71,3 +71,45 @@ scan(0..{n}, d -> print hilbertFunction(d, A));
     while h and h[-1] == 0:
         h.pop()
     return h
+
+
+def chow_ring_hilbert(n: int, flats: list[list[int]], top: list[int], augmented: bool = False,
+                      timeout: float = 1800) -> list[int]:
+    """Hilbert function of the Chow ring of a loopless matroid on 0..n-1 from its presentation,
+    given all flats (`top` is the ground set).
+
+    Chow ring (Adiprasito-Huh-Katz): generators x_F for the nonempty proper flats, relations
+    x_F x_G for incomparable F, G and sum_{F contains i} x_F - sum_{F contains j} x_F.
+    Augmented Chow ring (Braden-Huh-Matherne-Proudfoot-Wang): generators x_F for the proper
+    flats (the empty flat included) and y_i for the elements, relations
+    y_i - sum_{F not containing i} x_F, x_F x_G for incomparable F, G, and y_i x_F for i not in F."""
+    fl = [set(F) for F in flats if set(F) != set(top) and (augmented or F)]
+    m = len(fl)
+    if m == 0 and not augmented:
+        return [1]
+    gens = [f"x_{a}*x_{b}" for a in range(m) for b in range(a + 1, m)
+            if not (fl[a] <= fl[b] or fl[b] <= fl[a])]
+    if augmented:
+        for i in range(n):
+            s = " + ".join(f"x_{a}" for a in range(m) if i not in fl[a]) or "0"
+            gens.append(f"y_{i} - ({s})")
+            gens += [f"y_{i}*x_{a}" for a in range(m) if i not in fl[a]]
+        ring = f"QQ[x_0..x_{m - 1}, y_0..y_{n - 1}]"
+    else:
+        for i in range(1, n):
+            a = " + ".join(f"x_{k}" for k in range(m) if 0 in fl[k]) or "0"
+            b = " + ".join(f"x_{k}" for k in range(m) if i in fl[k]) or "0"
+            gens.append(f"({a}) - ({b})")
+        ring = f"QQ[x_0..x_{m - 1}]"
+    body = ",\n  ".join(gens) or "0_R"
+    code = f"""R = {ring};
+A = R / ideal(
+  {body});
+scan(0..{n + 1}, d -> print hilbertFunction(d, A));
+"""
+    h = [int(x) for x in run(code, timeout).split()]
+    if h[-1] != 0:
+        raise EngineError("Chow ring is not zero above the rank: the input is not a loopless matroid?")
+    while h and h[-1] == 0:
+        h.pop()
+    return h
