@@ -8,8 +8,10 @@
 #   docker build --build-arg WITH_MATHLIB=1 -t mtengine .
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
+# normaliz: Macaulay2's Polyhedra needs the executable, and with it every package built on
+# Polyhedra (Matroids, NormalToricVarieties, GKMVarieties, Tropical, ...) fails to load.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      macaulay2 gfan polymake singular nauty \
+      macaulay2 gfan polymake singular nauty normaliz \
       python3 python3-venv git curl ca-certificates zstd debian-keyring \
     && rm -rf /var/lib/apt/lists/*
 # Regina from its official apt repository (https://regina-normal.github.io/install/ubuntu.html)

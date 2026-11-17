@@ -136,7 +136,10 @@ The Lean backend compiles against a Lake project with Mathlib, the first found o
 
 `Dockerfile` builds Ubuntu 24.04 with every backend at the versions tested here
 (Macaulay2 1.22, gfan 0.6.2, polymake 4.11, Singular 4.3.2, nauty 2.8.8, Lean 4.36.0-rc1 +
-Mathlib, Regina 7.4.1):
+Mathlib, Regina 7.4.1), plus Normaliz 3.10.2, without which Macaulay2's Polyhedra and the
+packages built on it (Matroids, NormalToricVarieties, GKMVarieties, Tropical) do not load.
+Normaliz is a system package, not a Python one: `pip install` cannot bring it, so a
+non-Docker setup installs it with the other backends (`apt-get install normaliz`).
 
 ```sh
 docker build -t mtengine .
