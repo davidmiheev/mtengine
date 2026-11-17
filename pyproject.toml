@@ -19,6 +19,9 @@ mtengine-mcp = "mtengine.mcp_server:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+mtengine = ["lean_project/*"]   # the standard Lean project's pinned spec (`mte lean-init`)
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["slow: takes more than a few seconds"]

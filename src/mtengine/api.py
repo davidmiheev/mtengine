@@ -72,9 +72,19 @@ def graph_canonical_form(n: int, edges: list[list[int]], cells: list[list[int]] 
 def lean_check(source: str, theorems: list[str] | None = None, timeout: float = 3600,
                use_cache: bool = True) -> Json:
     """Compile Lean 4 source against the project's Mathlib; report errors and the axioms each
-    named theorem depends on (sorryAx => it uses sorry)."""
-    return core.cached("lean", "check", {"source": source, "theorems": theorems or []},
+    named theorem depends on (sorryAx => it uses sorry). The project is the one lean_status
+    reports; results are cached per Lean/Mathlib version and per content of the project's own
+    files, so editing a proof there invalidates them."""
+    return core.cached("lean", "check",
+                       {"source": source, "theorems": theorems or [], "project": lean.fingerprint()},
                        lambda: lean.check(source, theorems, timeout), use_cache)
+
+
+def lean_status() -> Json:
+    """Which Lake project lean_check compiles in (MTENGINE_LEAN_PROJECT, a sibling formal/, or
+    the standard project made by `mte lean-init`), whether it is ready, why not (with the fix),
+    candidates skipped and why, and the Lean/Mathlib versions it and the standard pin use."""
+    return lean.status()
 
 
 # ------------------------------------------------------------------ Regina (low-dimensional topology)
@@ -373,7 +383,7 @@ def job_status(job_id: str) -> Json:
 
 FUNCTIONS = {f.__name__: f for f in [
     versions, m2_run, singular_run, gkm_betti, tropical_variety, simplicial_homology,
-    graph_canonical_form, lean_check, regina_run, triangulation_invariants, census_lookup,
+    graph_canonical_form, lean_check, lean_status, regina_run, triangulation_invariants, census_lookup,
     hyperbolic_structure, turaev_viro, link_invariants, normal_surfaces, pachner_walk,
     simplify_triangulations, matroid_invariants, orlik_solomon, oriented_matroid, kazhdan_lusztig, chow_ring,
     hyperplane_arrangement,
