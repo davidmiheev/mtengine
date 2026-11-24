@@ -10,10 +10,12 @@
 # `docker run --rm mtengine .venv/bin/mte lean-status` says which project lean_check uses.
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
-# normaliz: Macaulay2's Polyhedra needs the executable, and with it every package built on
+# The apt packages of the backends, in one line that other installers read (the "math" cloud
+# environment's setup script takes its list from it): keep it a single ARG APT_BACKENDS="..." line.
+# normaliz: Macaulay2's Polyhedra needs the executable, and without it every package built on
 # Polyhedra (Matroids, NormalToricVarieties, GKMVarieties, Tropical, ...) fails to load.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      macaulay2 gfan polymake singular nauty normaliz \
+ARG APT_BACKENDS="macaulay2 gfan polymake singular nauty normaliz"
+RUN apt-get update && apt-get install -y --no-install-recommends $APT_BACKENDS \
       python3 python3-venv git curl ca-certificates zstd debian-keyring \
     && rm -rf /var/lib/apt/lists/*
 # Regina from its official apt repository (https://regina-normal.github.io/install/ubuntu.html)

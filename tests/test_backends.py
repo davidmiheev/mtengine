@@ -253,3 +253,14 @@ def test_lean_pinned_spec_is_consistent():
     assert lean.pinned() == {"toolchain": (lean.PINNED / "lean-toolchain").read_text().strip(),
                              "mathlib": ml["rev"]}
     assert lean.pinned()["toolchain"].startswith("leanprover/lean4:")
+
+
+def test_dockerfile_names_the_backend_packages():
+    """Installers outside Docker (the "math" cloud environment's setup script) take the backend
+    apt packages from the Dockerfile's single ARG APT_BACKENDS="..." line, with this pattern."""
+    import re
+    text = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text()
+    lines = re.findall(r'^ARG APT_BACKENDS="(.*)"$', text, re.M)
+    assert len(lines) == 1
+    assert {"macaulay2", "gfan", "polymake", "singular", "nauty", "normaliz"} <= set(lines[0].split())
+    assert "install -y --no-install-recommends $APT_BACKENDS" in text      # and Docker uses it
