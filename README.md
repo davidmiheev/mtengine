@@ -92,7 +92,7 @@ posets) are one application among others, not the scope of the engine.
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 .venv/bin/mte versions
 .venv/bin/mte call hessenberg_betti '{"kbar": [2, 2], "h": [2, 2]}'      # Gr(2,4)
-.venv/bin/pytest                                                           # 75 tests, a few minutes
+.venv/bin/pytest                                                           # 76 tests, a few minutes
 ```
 
 MCP server: `.venv/bin/mtengine-mcp` (stdio transport). For Claude Code, add to the `.mcp.json`
