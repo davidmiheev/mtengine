@@ -92,7 +92,7 @@ posets) are one application among others, not the scope of the engine.
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 .venv/bin/mte versions
 .venv/bin/mte call hessenberg_betti '{"kbar": [2, 2], "h": [2, 2]}'      # Gr(2,4)
-.venv/bin/pytest                                                           # 69 tests, a few minutes
+.venv/bin/pytest                                                           # 76 tests, a few minutes
 ```
 
 MCP server: `.venv/bin/mtengine-mcp` (stdio transport). For Claude Code, add to the `.mcp.json`
@@ -118,25 +118,46 @@ Set `MTENGINE_REGINA_PYTHON` to use another command, e.g. a `python3` that can
 .venv/bin/mte call polytope_invariants '{"points": [[0,0,0],[1,0,0],[0,1,0],[0,0,1]]}'
 ```
 
-The Lean backend compiles against a Lake project with Mathlib, the first found of:
-
-1. `$MTENGINE_LEAN_PROJECT`;
-2. `../formal` next to this checkout (where it is when mtengine is matroid_toric's `engine/`);
-3. the engine's own project, which `mte lean-init` creates in `$XDG_DATA_HOME/mtengine/lean`
-   (default `~/.local/share/mtengine/lean`): a Lake project that requires Mathlib (default tag
-   `v4.36.0-rc1`, `--mathlib` to change), with the toolchain taken from Mathlib, and the
-   prebuilt Mathlib downloaded (about 5 GB; `--no-cache` skips it). It needs `elan`.
+The Lean backend compiles in a Lake project with Mathlib. The **standard project** is pinned in
+this package (`src/mtengine/lean_project/`: `lean-toolchain`, `lakefile.toml` and a
+`lake-manifest.json` with the exact Mathlib commit, currently tag `v4.36.0-rc1` = `625d8914`), so
+every installation compiles against the same Lean and Mathlib. `mte lean-init` builds it in
+`$XDG_DATA_HOME/mtengine/lean` (default `~/.local/share/mtengine/lean`) and downloads the
+prebuilt Mathlib (about 5 GB, a few minutes; `--no-cache` skips it). It needs `elan`.
 
 ```sh
 .venv/bin/mte lean-init                    # once
+.venv/bin/mte lean-status                  # which project lean_check uses, and whether it is ready
 .venv/bin/mte call lean_check '{"source": "import Mathlib\nexample : (2 : ℚ) + 2 = 4 := by norm_num"}'
 ```
+
+A project with its own library (e.g. matroid_toric's `formal/`, for `import Formal`) is used
+instead when it is the first Lake project (a directory with `lean-toolchain` and a lakefile) of:
+
+1. `$MTENGINE_LEAN_PROJECT`;
+2. `../formal` next to this checkout (where it is when mtengine is matroid_toric's `engine/`);
+3. the standard project.
+
+A candidate that is not a Lake project, such as a variable naming a directory that does not exist
+in this checkout, is skipped and listed by `lean_status`; a chosen project that is not built is
+reported, not passed over. `lean_status` (`mte lean-status`), `mte versions` and the test
+suite read the same answer, and `lean_check` refuses to run, saying what to do, when the project
+is not ready. Its results are cached per Lean and Mathlib version and per content of the
+project's own files, so editing a proof in `formal/` invalidates the results that used it; each
+result names the project it was compiled in.
+
+To move the pin to another Mathlib release: `mte lean-init --mathlib <tag> <dir>`, then copy
+`lean-toolchain`, `lakefile.toml` and `lake-manifest.json` from `<dir>` into
+`src/mtengine/lean_project/`.
 
 ## Reproducible toolchain
 
 `Dockerfile` builds Ubuntu 24.04 with every backend at the versions tested here
 (Macaulay2 1.22, gfan 0.6.2, polymake 4.11, Singular 4.3.2, nauty 2.8.8, Lean 4.36.0-rc1 +
-Mathlib, Regina 7.4.1):
+Mathlib, Regina 7.4.1), plus Normaliz 3.10.2, without which Macaulay2's Polyhedra and the
+packages built on it (Matroids, NormalToricVarieties, GKMVarieties, Tropical) do not load.
+Normaliz is a system package, not a Python one: `pip install` cannot bring it, so a
+non-Docker setup installs it with the other backends (`apt-get install normaliz`).
 
 ```sh
 docker build -t mtengine .

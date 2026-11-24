@@ -75,12 +75,18 @@ _VERSION_CMDS = {
 }
 
 
-@lru_cache(maxsize=None)
 def tool_version(tool: str) -> str:
-    """Version string of a backend (cached for the life of the process)."""
+    """Version string of a backend. Cached for the life of the process, except Lean's, which
+    follows the Lake project in use (it changes with `mte lean-init` or MTENGINE_LEAN_PROJECT)
+    and is memoised by the Lean adapter itself."""
     if tool == "lean":
         from .backends import lean
         return lean.version()
+    return _tool_version(tool)
+
+
+@lru_cache(maxsize=None)
+def _tool_version(tool: str) -> str:
     if tool == "regina":
         from .backends import regina
         return regina.version()
